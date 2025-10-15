@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Mini Mario Móvil</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<style>
+  html, body {
+    margin:0; padding:0;
+    background:#7ec0ee;
+    overflow:hidden;
+    touch-action:none;
+    -webkit-user-select:none;
+  }
+  canvas {
+    display:block;
+    margin:auto;
+    background:linear-gradient(#87CEFA,#7ec0ee);
+  }
+  .btns {
+    position:fixed;
+    bottom:15px;
+    left:0; right:0;
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    pointer-events:auto;
+  }
+  button {
+    background:#ff7043;
+    border:none;
+    border-radius:50%;
+    width:60px; height:60px;
+    color:#fff;
+    font-size:22px;
+    font-weight:bold;
+    box-shadow:0 4px 0 #d35400;
+  }
+  button:active {
+    background:#e64a19;
+    transform:translateY(3px);
+    box-shadow:0 1px 0 #a84300;
+  }
+</style>
+</head>
+<body>
+<canvas id="game" width="960" height="540"></canvas>
+
+<!-- Controles táctiles -->
+<div class="btns">
+  <button id="left">←</button>
+  <button id="jump">↑</button>
+  <button id="right">→</button>
+</div>
+
+<script>
+// === Configuración básica ===
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const W = canvas.width, H = canvas.height;
+
+const TILE = 48, GRAVITY = 1200;
+let last = performance.now();
+const keys = { left:false, right:false, jump:false };
+
+document.getElementById("left").ontouchstart = () => keys.left = true;
+document.getElementById("left").ontouchend = () => keys.left = false;
+document.getElementById("right").ontouchstart = () => keys.right = true;
+document.getElementById("right").ontouchend = () => keys.right = false;
+document.getElementById("jump").ontouchstart = () => keys.jump = true;
+document.getElementById("jump").ontouchend = () => keys.jump = false;
+
+// === Jugador ===
+const player = {x:50, y:400, w:32, h:40, vx:0, vy:0, canJump:false, coins:0};
+
+// === Nivel simple ===
+const blocks = [
+  {x:0, y:500, w:960, h:40},
+  {x:150, y:420, w:120, h:20},
+  {x:340, y:360, w:100, h:20},
+  {x:520, y:300, w:120, h:20},
+  {x:700, y:240, w:100, h:20}
+];
+const coins = [
+  {x:180, y:380, r:10, c:false},
+  {x:370, y:320, r:10, c:false},
+  {x:550, y:260, r:10, c:false},
+  {x:720, y:200, r:10, c:false},
+];
+
+// === Física simple ===
+function applyPhysics(dt){
+  player.vy += GRAVITY * dt;
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+}
+
+// === Colisiones con bloques ===
+function checkCollisions(){
+  player.canJump = false;
+  for (const b of blocks){
+    if (player.x < b.x + b.w &&
+        player.x + player.w > b.x &&
+        player.y < b.y + b.h &&
+        player.y + player.h > b.y) {
+      // Colisión vertical
+      if (player.vy > 0 && player.y + player.h - player.vy*0.016 <= b.y){
+        player.y = b.y - player.h;
+        player.vy = 0;
+        player.canJump = true;
+      }
+    }
+  }
+  if (player.y > H) restart();
+}
+
+// === Reiniciar ===
+function restart(){
+  player.x=50; player.y=400; player.vx=player.vy=0; player.coins=0;
+  for (const c of coins) c.c=false;
+}
+
+// === Actualizar jugador ===
+function update(dt){
+  const speed = 220;
+  if (keys.left) player.vx = -speed;
+  else if (keys.right) player.vx = speed;
+  else player.vx = 0;
+  if (keys.jump && player.canJump){
+    player.vy = -500;
+    player.canJump = false;
+  }
+  applyPhysics(dt);
+  checkCollisions();
+  // recoger monedas
+  for (const c of coins){
+    if (!c.c && Math.hypot((player.x+16)-(c.x+10),(player.y+20)-(c.y+10)) < 25){
+      c.c = true;
+      player.coins++;
+    }
+  }
+}
+
+// === Dibujar ===
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = "#8B4513";
+  for (const b of blocks) ctx.fillRect(b.x,b.y,b.w,b.h);
+  ctx.fillStyle = "#ffeb3b";
+  for (const c of coins) if(!c.c) ctx.beginPath(),ctx.arc(c.x,c.y,c.r,0,Math.PI*2),ctx.fill();
+  ctx.fillStyle = "#e53935";
+  ctx.fillRect(player.x,player.y,player.w,player.h);
+  ctx.fillStyle = "#fff";
+  ctx.font = "24px Arial";
+  ctx.fillText("Monedas: "+player.coins+"/"+coins.length,20,30);
+  if (player.coins===coins.length){
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(W/2-150,H/2-40,300,80);
+    ctx.fillStyle = "#fff";
+    ctx.font = "28px Arial";
+    ctx.fillText("¡Ganaste! 🎉",W/2-80,H/2+10);
+  }
+}
+
+// === Bucle principal ===
+function loop(now){
+  const dt = Math.min(0.033,(now-last)/1000);
+  last = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+loop(performance.now());
+</script>
+</body>
+</html>
